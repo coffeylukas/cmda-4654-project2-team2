@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
   <head>
-    <title>Presentation Ninja</title>
+    <title>Boosted Trees</title>
     <meta charset="utf-8" />
-    <meta name="author" content="Yihui Xie" />
+    <meta name="author" content="CMDA 4654" />
+    <meta name="date" content="2019-11-30" />
     <link href="libs/remark-css/default.css" rel="stylesheet" />
-    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
     <script src="libs/htmlwidgets/htmlwidgets.js"></script>
     <script src="libs/jquery/jquery.min.js"></script>
     <link href="libs/leaflet/leaflet.css" rel="stylesheet" />
@@ -27,47 +29,49 @@
     <textarea id="source">
 class: center, middle, inverse, title-slide
 
-# Presentation Ninja
-## ⚔<br/>with xaringan
-### Yihui Xie
-### RStudio, Inc.
-### 2016/12/12 (updated: 2019-11-15)
+# Boosted Trees
+## Project 2, by Group 2
+### CMDA 4654
+### 2019-11-30
 
 ---
 
 
-background-image: url(https://upload.wikimedia.org/wikipedia/commons/b/be/Sharingan_triple.svg)
 
 
+# Outline
 
-???
-
-Image credit: [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sharingan_triple.svg)
-
----
-class: center, middle
-
-# xaringan
-
-### /ʃaː.'riŋ.ɡan/
-
----
-class: inverse, center, middle
-
-# Get Started
+- Summary of boosted trees
+- Theory behind gradient boosting and boosted trees
+- Example where other methods are not effective
+- Example using boosted tree classification
+- Example on a large dataset
 
 ---
 
-# Hello World
+# Summary of Boosted Trees
 
-Install the **xaringan** package from [Github](https://github.com/yihui/xaringan):
-
-
-```r
-devtools::install_github("yihui/xaringan")
-```
+Commonly referred too as gradient boosting, boosted trees is a method that works against the common problem among trees - overfitting a dataset. It's called "gradient" boosting because it uses gradient descent to iteratively find the best fit to the data. The idea stems from a method called Adaboost, which we will not discuss here but you can find plenty of resources online. Understanding Adaboost really helps you understand the underlying methodology behind gradient boosting.
 
 --
+
+There are two types of gradient tree boosting, **regression** and **classification**. The concept is similar but the implementation is different depending on the use case. In this presentation we will touch on classification but focus on regression.
+
+---
+
+# Summary of Boosted Trees
+
+**Main Idea:** Gradient boost works by creating small trees (known as weak learners) of a set size, fitting the data and testing it, and creating new trees to fit the residuals of the previous tree.
+
+--
+
+Each step of the algorithm creates a new tree that may be small or large, depending on your tuning parameters. The next step in the algorithm creates a new tree that predicts the errors (residuals) from the last tree. All of the trees are then **scaled** by a tuning parameter between 0 and 1. *This scale tuning parameter basically determines how quickly our boosted trees find a good fit, AKA how many trees need to be created to minimize the errors.*
+
+--
+
+This happens for either **A)** a specified number of steps, or **B)** the errors become sufficiently small.
+
+---
 
 You are recommended to use the [RStudio IDE](https://www.rstudio.com/products/rstudio/), but you do not have to.
 
@@ -335,8 +339,8 @@ library(leaflet)
 leaflet() %&gt;% addTiles() %&gt;% setView(-93.65, 42.0285, zoom = 17)
 ```
 
-<div id="htmlwidget-82ed11311265c59a3d1d" style="width:100%;height:432px;" class="leaflet html-widget"></div>
-<script type="application/json" data-for="htmlwidget-82ed11311265c59a3d1d">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addTiles","args":["//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false,"attribution":"&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"}]}],"setView":[[42.0285,-93.65],17,[]]},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-93e047d52fe8d23183e6" style="width:100%;height:432px;" class="leaflet html-widget"></div>
+<script type="application/json" data-for="htmlwidget-93e047d52fe8d23183e6">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addTiles","args":["//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false,"attribution":"&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"}]}],"setView":[[42.0285,-93.65],17,[]]},"evals":[],"jsHooks":[]}</script>
 
 ---
 
@@ -348,8 +352,8 @@ DT::datatable(
 )
 ```
 
-<div id="htmlwidget-8564de5749a12ad72fff" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-8564de5749a12ad72fff">{"x":{"filter":"none","fillContainer":false,"data":[["1","2","3","4","5","6","7","8","9","10"],[5.1,4.9,4.7,4.6,5,5.4,4.6,5,4.4,4.9],[3.5,3,3.2,3.1,3.6,3.9,3.4,3.4,2.9,3.1],[1.4,1.4,1.3,1.5,1.4,1.7,1.4,1.5,1.4,1.5],[0.2,0.2,0.2,0.2,0.2,0.4,0.3,0.2,0.2,0.1],["setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>Sepal.Length<\/th>\n      <th>Sepal.Width<\/th>\n      <th>Petal.Length<\/th>\n      <th>Petal.Width<\/th>\n      <th>Species<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"pageLength":8,"columnDefs":[{"className":"dt-right","targets":[1,2,3,4]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false,"lengthMenu":[8,10,25,50,100]}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-43c7e12b86cf441ec1a7" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-43c7e12b86cf441ec1a7">{"x":{"filter":"none","fillContainer":false,"data":[["1","2","3","4","5","6","7","8","9","10"],[5.1,4.9,4.7,4.6,5,5.4,4.6,5,4.4,4.9],[3.5,3,3.2,3.1,3.6,3.9,3.4,3.4,2.9,3.1],[1.4,1.4,1.3,1.5,1.4,1.7,1.4,1.5,1.4,1.5],[0.2,0.2,0.2,0.2,0.2,0.4,0.3,0.2,0.2,0.1],["setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>Sepal.Length<\/th>\n      <th>Sepal.Width<\/th>\n      <th>Petal.Length<\/th>\n      <th>Petal.Width<\/th>\n      <th>Species<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"pageLength":8,"columnDefs":[{"className":"dt-right","targets":[1,2,3,4]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false,"lengthMenu":[8,10,25,50,100]}},"evals":[],"jsHooks":[]}</script>
 
 ---
 
