@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Boosted Trees</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="CMDA 4654" />
+    <meta name="date" content="2019-12-01" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Boosted Trees
+## Project 2, by Group 2
+### CMDA 4654
+### 2019-12-01
+
+---
+
+
+
+
+# Outline
+
+- Summary of boosted trees
+- Theory behind gradient boosting and boosted trees
+- Example where other methods are not effective
+- Example using boosted tree classification
+- Example on a large dataset
+
+---
+
+# Summary of Boosted Trees
+
+Commonly referred too as gradient boosting, boosted trees is a method that works against the common problem among trees - overfitting a dataset. It's called "gradient" boosting because it uses gradient descent to iteratively find the best fit to the data. The idea stems from a method called Adaboost, which we will not discuss here but you can find plenty of resources online. Understanding Adaboost really helps you understand the underlying methodology behind gradient boosting.
+
+There are two types of gradient tree boosting, **regression** and **classification**. The concept is similar but the implementation is different depending on the use case. In this presentation we will touch on classification but focus on regression.
+
+---
+
+# Summary of Boosted Trees
+
+**Main Idea:** Gradient boost works by creating small trees (known as weak learners) of a set size, fitting the data and testing it, and creating new trees to fit the residuals of the previous tree.
+
+Each step of the algorithm creates a new tree that may be small or large using random samples of columns *and* rows, depending on your tuning parameters. The next step in the algorithm creates a new tree that predicts the errors (residuals) from the last tree. All of the trees are then **scaled** by a tuning parameter between 0 and 1. *This scale tuning parameter basically determines how quickly our boosted trees find a good fit, AKA how many trees need to be created to minimize the errors.*
+
+This happens for either **A)** a specified number of steps, or **B)** the errors become sufficiently small.
+
+You can see how this is similar to random forests in that the algorithm creates many trees, and can use random samples of columns. However, the algorithm can also use samples of rows, and it does not *have* to use random samples of either but can also use the entire dataset.
+
+---
+
+# Boosted Regression
+## References
+- Gradient Boosting Explained: http://blog.kaggle.com/2017/01/23/a-kaggle-master-explains-gradient-boosting/
+- Gradient Boosting: https://en.wikipedia.org/wiki/Gradient_boosting
+- StatQuest - Gradient Boost, Parts 1 &amp; 2: https://www.youtube.com/watch?v=3CC4N4z3GJc&amp;t=582s
+
+---
+
+# Boosted Regression - Main Idea
+
+The main idea behind boosted regression is that we fit a model, then fit another model to the residuals, and then the combination of these becomes the new model. We iterate this idea to find the optimal model. In pseudocode:
+
+**Step 1:** We fit the original model.
+
+`$$F_1(x) = y$$`
+
+**Step 2:** We fir a new model to the residuals of the model in Step 1.
+
+`$$h_1(x) = y - F_1(x)$$`
+
+**Step 3:** We combine the two previous models to find the next step in the algorithm.
+
+`$$F_2(x) = F_1(x) + h_1(x)$$`
+
+---
+
+# Boosted Regression - Step 1
+
+To start the regression algorithm, we initialize the model with the average of our `\(y\)` values. This becomes our starting point because initially we want to minimize the squared error. 
+
+`$$F_0(x) = \underset{\gamma}{argmin} \sum_{i=1}^n{L(y_i, \gamma)} = \underset{\gamma}{argmin} \sum_{i=1}^n{(\gamma - y_i)^2} = \frac{1}{n}\sum_{i=1}^n{y_i}$$`
+
+Now, we can define the following models just like we did before in pseudocode.
+
+`$$F_{m+1}(x) = F_m(x) + h_m(x)=y,\ for\ m\ge0$$`
+
+where `\(h_m\)` is a base learner (e.g. weak learner; tree).
+
+**Note:** How do we select `\(M\)`? This value determines how many times we iterate until we find the best model. This is best done by cross-validation.
+
+---
+
+# Boosted Regression - Step 2
+
+After we initialize the model, `\(F_0(x)\)`, we can begin iterating. Each iteration contains 4 steps:
+
+**Step 1:** Compute the pseudo-residuals (this is the gradient descent part of *gradient* boost).
+`$$r_{im} = - \left[\frac{\partial L(y_i,F(x_i))}{\partial F(x_i)}\right]_{F(x)=F_{m-1}(x)}\ for\ i=1,...,n$$`
+
+**Step 2:** Fit a base learner (weak learner, e.g. a tree) to the pseudo-residuals. This is `\(h_m(x)\)`.
+
+**Step 3:** Compute the step magnitude multiplier, `\(\gamma_m\)`, by solving the 1D optimization problem:
+`$$\gamma_m = \underset{\gamma}{argmin} \sum_{i=1}^n{L(y_i,\ F_{m-1}(x_i) + \gamma h_m(x_i))}$$`
+
+**Step 4:** Update the model with the new pieces:
+`$$F_m(x) = F_{m-1}(x)+\gamma_mh_m(x)$$`
+
+---
+
+# Boosted Regression - Step 3
+
+After we compute all the iterations of the algorithm, our final model is then:
+`$$for\ m=1\ to\ M,\\ F_M(x)$$`
+
+with inputs:
+1. Training data set, `\({(x_i, y_i)}_{i=1}^{n}\)`
+2. Loss function, `\(L(y, F(x))\)`
+3. Number of iterations, `\(M\)`
+
+We will talk about `\(M\)` and a few more pieces to the algorithm next.
+
+---
+
+# Boosted Trees - Regularization
+
+One of the main goals in using boosted trees is to avoid overfitting the data. To achieve a boosted model that is well-generalized and not overfitted, we can make use of **regularization**. These are just a few of the regularization parameters that we can use to control effectiveness of the boosting algorithm:
+- The number of iterations, `\(M\)`
+- Maximum tree depth
+- Minimum number of observations in tree leaves
+- Penalizing complexity: pruning back the weak learners that don't provide any benefit
+- Shrinkage parameter, `\(\nu\)`, known as the *"learning rate"*
+- Size of the trees
+
+**The number of iterations, `\(M\)`**
+
+This is the number of times we should run the gradient descent algorithm (basically the number of trees we create). As stated previously, `\(M\)` is most commonly chosen using cross-validation. Increasing `\(M\)` reduces error on the training set, but making `\(M\)` too high can lead to overfitting.
+
+---
+
+# BT - Regularization Parameters
+
+**Maximum tree depth**
+
+This is the maximum distance from the root node to the furthest leaf node in each of our trees. This helps control how "weak" our weak learners should actually be.
+
+**Minimum number of observations in tree leaves**
+
+This parameter controls the minimum number of observations within each leaf of the weak learners. This tells the weak learners to basically ignore any splits or new terminal nodes that have fewer observations than this number. This helps to reduce variance in the predictions at the leaves.
+
+**Penalizing complexity: pruning back the weak learners that don't provide any benefit**
+
+This is defined as the "proportional number of leaves in the learned trees." We can employ a post-pruning algorithm that removes branches failing to reduce the loss by a certain threshold. This basically helps to keep the trees from becoming too strong and overfitting.
+
+---
+
+# BT - Regularization Parameters, cont.
+
+**Shrinkage parameter, `\(\nu\)`, known as the "learning rate"**
+
+This is arguably one of the most important parameters. This parameter is a value between 0 and 1, and controls how fast or slow our boosted algorithm finds the optimal model. A lower learning rate (e.g. 0.1) means higher computation time and more iterations, but a better and more generalized model. It is applied to the algorithm as:
+`$$F_m(x) = F_{m-1}(x)+\nu\cdot\gamma_mh_m(x)$$`
+
+**Size of the trees**
+
+The tree size parameter, `\(J\)`, controls the number of terminal nodes in each weak learner. `\(J=2\)` would result in each tree being a stump, and no variable-variable interaction. `\(J=3\)` would allow for a maximum of 2 variables per tree, and a max of 3 leaves. This is a strong controller of the complexity of the trees in the algorithm and coupled with the learning rate can have a big effect on computation time.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
