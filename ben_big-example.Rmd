@@ -1,0 +1,218 @@
+---
+title: "Boosted Trees"
+subtitle: "Project 2, by Group 2"
+author: "CMDA 4654"
+date: "`r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE,
+        show.signif.stars = FALSE) 
+```
+
+---
+
+# Big Example (Economic Freedom)
+
+The following dataset is used to determine the freedom index and was published in the *Economic Freedom of the World* by the *Fraser Institute* measures the degree to which the policies and istitutions of countries are supportive of economic freedom. There are 36 variables in this data set but each of them fit into a one of the five broad areas.
+
+**1.** Size of Goverment
+**2.** Legal System and Property Rights
+**3.** Sound Money
+**4.** Freedom to Trade Internatioanlly
+**5.** Regulation
+
+- Dataset: https://www.kaggle.com/gsutters/economic-freedom
+
+---
+
+#Economic Freedom (Read and split)
+
+```{r}
+library(gbm)
+library(rsample)
+library(dplyr)
+library(caret)
+library(xaringan)
+```
+These are the re
+
+```{r,echo=FALSE}
+freedom <- read.csv("C:/Users/benny/OneDrive/Documents/CMDA 4654/economic-freedom/efw_cc.csv", header = T)
+freedom <- freedom[!is.na(freedom$ECONOMIC.FREEDOM),]
+
+```
+
+---
+
+#Economic Freedom (Initial Model)
+
+```{r}
+set.seed(123)
+free_split <- initial_split(freedom, prop = .7)
+free_train <- training(free_split)
+free_test  <- testing(free_split)
+gbm.fit <- gbm(
+  formula = ECONOMIC.FREEDOM ~ .,
+  distribution = "gaussian",
+  data = free_train,
+  n.trees = 5000,
+  interaction.depth = 1,
+  shrinkage = 0.001,
+  cv.folds = 5,
+  n.cores = NULL, # will use all cores by default
+  verbose = FALSE
+)
+
+gbm.fit
+head(summary(gbm.fit),10)
+
+
+```
+
+If you wanted to use gradient boosting for classification, all you need to do to implement it is to change the distribution to bernoulli and to make sure your response variable is a column that represents some sort of classification and contains either ones or zeros.
+
+---
+
+
+#Economic Freedom (MSE and Min Trees)
+
+```{r}
+# get MSE and compute RMSE
+sqrt(min(gbm.fit$cv.error))
+
+# plot loss function as a result of n trees added to the ensemble
+gbm.perf(gbm.fit, method = "cv")
+```
+
+
+---
+
+#Economic Freedom (Second Model)
+
+```{r}
+gbm.fit2 <- gbm(
+  formula = ECONOMIC.FREEDOM ~ .,
+  distribution = "gaussian",
+  data = free_train,
+  n.trees = 2500,
+  interaction.depth = 3,
+  shrinkage = 0.1,
+  cv.folds = 5,
+  n.cores = NULL, # will use all cores by default
+  verbose = FALSE
+)  
+
+# find index for n trees with minimum CV error
+min_MSE <- which.min(gbm.fit2$cv.error)
+min_MSE
+
+# get MSE and compute RMSE
+sqrt(gbm.fit2$cv.error[min_MSE])
+
+```
+
+---
+
+#Economic Freedom (Min Trees)
+
+```{r}
+# plot loss function as a result of n trees added to the ensemble
+gbm.perf(gbm.fit2, method = "cv")
+
+```
+
+---
+
+#Economic Freedom (Multiple Models)
+
+```{r}
+hyper_grid <- expand.grid(
+  shrinkage = c(.01, .1, .3),
+  interaction.depth = c(1, 3, 5),
+  n.minobsinnode = c(5, 10, 15),
+  bag.fraction = c(.65, .8, 1), 
+  optimal_trees = 0,               # a place to dump results
+  min_RMSE = 0                     # a place to dump results
+)
+
+#for(i in 1:nrow(hyper_grid)) {
+#  
+#  # train model
+#  gbm.tune <- gbm(
+#    formula = ECONOMIC.FREEDOM ~ .,
+#    distribution = "gaussian",
+#    data = free_train,
+#    n.trees = 2500,
+#    interaction.depth = hyper_grid$interaction.depth[i],
+#    shrinkage = hyper_grid$shrinkage[i],
+#    n.minobsinnode = hyper_grid$n.minobsinnode[i],
+#    bag.fraction = hyper_grid$bag.fraction[i],
+#    train.fraction = .75,
+#    n.cores = NULL, # will use all cores by default
+#    verbose = FALSE
+#  )
+  
+  # add min training error and trees to grid
+#  hyper_grid$optimal_trees[i] <- which.min(gbm.tune$valid.error)
+#  hyper_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
+  
+#}
+
+```
+
+---
+
+#Economic Freedom (multiple Models cont.)
+
+```{r}
+#hyper_grid %>% 
+#  dplyr::arrange(min_RMSE) %>%
+#  head(10)
+
+
+```
+
+---
+
+#Economic Freedom (Best Model)
+
+```{r}
+# This is the best model from the above
+gbm.fit.final <- gbm(
+  formula = ECONOMIC.FREEDOM ~ .,
+  distribution = "gaussian",
+  data = free_train,
+  n.trees = 4960,
+  interaction.depth = 1,
+  shrinkage = 0.3,
+  n.minobsinnode = 15,
+  bag.fraction = 1,
+  n.cores = NULL, # will use all cores by default
+  verbose = FALSE
+)
+
+summary(
+  gbm.fit.final, 
+  cBars = 10,
+  method = relative.influence, # also can use permutation.test.gbm
+  las = 2
+)
+
+# Predictions and RMSE
+pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, free_test)
+
+caret::RMSE(pred, free_test$ECONOMIC.FREEDOM)
+
+```
+
+
+
