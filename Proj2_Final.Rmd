@@ -375,6 +375,8 @@ data.frame(var = fit_sum$var,
 
 # Partial Dependence Plots
 
+Show us the marginal effect of variables on the predicted outcome.
+
 .pull-left[
 ```{r, eval = FALSE}
 plot(boston_fit, i = "lstat")
