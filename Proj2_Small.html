@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Presentation Ninja</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Yihui Xie" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Presentation Ninja
+## ⚔<br/>with xaringan
+### Yihui Xie
+### RStudio, Inc.
+### 2016/12/12 (updated: 2019-12-02)
+
+---
+
+
+
+
+
+
+---
+
+# Small Example: Boston Housing Dataset
+
+
+
+
+```r
+set.seed(101)
+
+train &lt;- sample(1:506, size = 354) # 70% train, 30% test
+
+boston_fit &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                  n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                  bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                  cv.folds = 5)
+boston_fit
+```
+
+```
+## gbm(formula = medv ~ ., distribution = "gaussian", data = Boston[train, 
+##     ], n.trees = 10000, interaction.depth = 2, n.minobsinnode = 5, 
+##     shrinkage = 0.01, bag.fraction = 1, train.fraction = 1, cv.folds = 5)
+## A gradient boosted model with gaussian loss function.
+## 10000 iterations were performed.
+*## The best cross-validation iteration was 2239.
+## There were 13 predictors of which 13 had non-zero influence.
+```
+
+---
+
+# Variable Importance
+
+.pull-left[
+
+```r
+fit_sum &lt;- summary(boston_fit)
+```
+
+![](Proj2_Small_files/figure-html/unnamed-chunk-3-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+```r
+data.frame(var = fit_sum$var,
+           rel.inf = fit_sum$rel.inf)
+```
+
+```
+##        var     rel.inf
+*## 1    lstat 45.79230143
+*## 2       rm 31.23139819
+## 3      dis  6.12672951
+## 4      nox  5.25810029
+## 5  ptratio  3.89834070
+## 6     crim  3.04664748
+## 7      age  2.31679100
+## 8    black  0.93879450
+## 9      tax  0.69499335
+## 10     rad  0.35895333
+## 11    chas  0.17658919
+## 12   indus  0.09791081
+## 13      zn  0.06245022
+```
+]
+
+---
+
+# Partial Dependence Plots
+
+.pull-left[
+
+```r
+plot(boston_fit, i = "lstat")
+```
+![](Proj2_Small_files/figure-html/unnamed-chunk-6-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+```r
+plot(boston_fit, i = "rm")
+```
+![](Proj2_Small_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+]
+
+---
+class: center, middle
+# Optimal Number of Boosting Iterations
+
+
+```r
+best.iter &lt;- gbm.perf(boston_fit, method = "cv")
+```
+![](Proj2_Small_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+---
+class: middle
+
+
+```r
+pred &lt;- predict.gbm(boston_fit, Boston[-train,], n.trees = best.iter)
+
+error &lt;- sum((pred - Boston$medv[-train])^2)
+print(error)
+```
+
+```
+*## [1] 1968.915
+*```
+
+---
+# Parameter Fine Tuning
+
+
+```r
+boston_fit1 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit2 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit3 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+
+boston_fit4 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.1, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+```
+
+---
+class: center, middle
+
+
+
+
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; model &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n.trees &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; shrinkage &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n.minobsinnode &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; best_iter &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; error &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2239 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1968.915 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4998 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1909.311 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2189 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2045.575 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 356 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1940.182 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+
+# Comparison with Random Forest
+
+
+```r
+rf &lt;- randomForest(medv ~ ., data = Boston[train,], distribution = "gaussian", 
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   nodesize = 5)
+```
+
+.pull-left[
+
+```
+##         IncNodePurity
+## crim        1957.5808
+## zn           194.0213
+## indus       1500.8585
+## chas         243.5554
+## nox         1979.7474
+*## rm          7894.3595
+## age          757.2650
+## dis         1762.4770
+## rad          328.8089
+## tax          730.4825
+## ptratio     1822.4640
+## black        594.3402
+*## lstat       8884.3577
+```
+]
+
+.pull-right[
+![](Proj2_Small_files/figure-html/unnamed-chunk-18-1.png)&lt;!-- --&gt;
+]
+
+---
+class: middle
+# Comparison with Random Forest
+
+
+```r
+predRF &lt;- predict(rf, Boston[-train,], type = "response")
+
+errorRF &lt;- sum((predRF - Boston$medv[-train])^2)
+print(errorRF)
+```
+
+```
+*## [1] 2020.809
+*```
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

@@ -1,0 +1,199 @@
+---
+title: "Presentation Ninja"
+subtitle: "⚔<br/>with xaringan"
+author: "Yihui Xie"
+institute: "RStudio, Inc."
+date: "2016/12/12 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE,
+        show.signif.stars = FALSE)
+```
+
+
+---
+
+# Small Example: Boston Housing Dataset
+
+```{r, echo = FALSE, message = FALSE}
+library(gbm)
+library(MASS)
+library(randomForest)
+library(knitr)
+```
+
+```{r, highlight.output = 6}
+set.seed(101)
+
+train <- sample(1:506, size = 354) # 70% train, 30% test
+
+boston_fit <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                  n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                  bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                  cv.folds = 5)
+boston_fit
+```
+
+---
+
+# Variable Importance
+
+.pull-left[
+```{r}
+fit_sum <- summary(boston_fit)
+```
+]
+
+.pull-right[
+```{r, highlight.output = c(2,3)}
+data.frame(var = fit_sum$var,
+           rel.inf = fit_sum$rel.inf)
+```
+]
+
+---
+
+# Partial Dependence Plots
+
+.pull-left[
+```{r, eval = FALSE}
+plot(boston_fit, i = "lstat")
+```
+```{r, echo = FALSE}
+plot(boston_fit, i = "lstat")
+par(cex.axis = 1.3, cex.lab = 1.3)
+title(main = "Partial Dependence Plot for lstat")
+```
+]
+
+.pull-right[
+```{r, eval = FALSE}
+plot(boston_fit, i = "rm")
+```
+```{r, echo = FALSE}
+plot(boston_fit, i = "rm")
+par(cex.axis = 1.3, cex.lab = 1.3)
+title(main = "Partial Dependence Plot for rm")
+```
+]
+
+---
+class: center, middle
+# Optimal Number of Boosting Iterations
+
+```{r, eval = FALSE}
+best.iter <- gbm.perf(boston_fit, method = "cv")
+```
+```{r, echo = FALSE}
+best.iter <- gbm.perf(boston_fit, method = "cv")
+title("GBM Performance")
+legend("topright", legend = c("CV Error", "Validation Error", "Optimal Iterations"), col = c("green", "black", "blue"), lty = c(1,1,2))
+```
+---
+class: middle
+
+```{r, highlight.output = TRUE}
+pred <- predict.gbm(boston_fit, Boston[-train,], n.trees = best.iter)
+
+error <- sum((pred - Boston$medv[-train])^2)
+print(error)
+```
+
+---
+# Parameter Fine Tuning
+
+```{r}
+boston_fit1 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit2 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit3 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+
+boston_fit4 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.1, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+
+```
+
+---
+class: center, middle
+
+```{r, include = FALSE}
+best.iter2 <- gbm.perf(boston_fit2, method = "cv")
+best.iter3 <- gbm.perf(boston_fit3, method = "cv")
+best.iter4 <- gbm.perf(boston_fit4, method = "cv")
+```
+
+```{r, echo = FALSE}
+pred2 <- predict.gbm(boston_fit2, Boston[-train,], n.trees = best.iter2, type = "response")
+pred3 <- predict.gbm(boston_fit3, Boston[-train,], n.trees = best.iter3, type = "response")
+pred4 <- predict.gbm(boston_fit4, Boston[-train,], n.trees = best.iter4, type = "response")
+
+error2 <- sum((pred2 - Boston$medv[-train])^2)
+error3 <- sum((pred3 - Boston$medv[-train])^2)
+error4 <- sum((pred4 - Boston$medv[-train])^2)
+```
+
+```{r, echo = FALSE, highlight.output = 3}
+df <- data.frame(model = c("boston_fit1", "boston_fit2", "boston_fit3", "boston_fit4"), n.trees = c(10000, 5000, 10000, 5000), shrinkage = c(0.01, 0.01, 0.01, 0.1), n.minobsinnode = c(5, 5, 10, 10), best_iter = c(best.iter, best.iter2, best.iter3, best.iter4), error = c(error, error2, error3, error4))
+
+knitr::kable(df, format = "html")
+```
+
+
+---
+
+# Comparison with Random Forest
+
+```{r}
+rf <- randomForest(medv ~ ., data = Boston[train,], distribution = "gaussian", 
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   nodesize = 5)
+```
+
+.pull-left[
+```{r, highlight.output = c(7,14), echo = FALSE}
+rf$importance
+```
+]
+
+.pull-right[
+```{r, echo = FALSE}
+plot(rf$importance, ylab = "IncNodePurity", main = "Variable Importance Plot", cex = 2, pch = 20)
+```
+]
+
+---
+class: middle
+# Comparison with Random Forest
+
+```{r, highlight.output = TRUE}
+predRF <- predict(rf, Boston[-train,], type = "response")
+
+errorRF <- sum((predRF - Boston$medv[-train])^2)
+print(errorRF)
+```
+
+
+
+
