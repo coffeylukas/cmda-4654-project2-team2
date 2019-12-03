@@ -55,6 +55,25 @@ You can see how this is similar to random forests in that the algorithm creates 
 
 ---
 
+# Pros &amp; Cons
+
+**Pros**
+
+- Easily interpretable
+- Robust to outliers
+- Can deal with continuous and categorical
+- Capture non-linear relationships well
+- Scale to large datasets
+
+**Cons**
+
+- Can tend to overfit with predictors that have many categories
+- Lack smoothness
+- Can tend to have limited predictive performance
+- Can take a long time to run depending on hyperparameters
+
+---
+
 # Terminology
 
 There is quite a bit of mixed jargon with regards to boosted trees. Since we're using gradient descent to "boost" normal decision trees, the method is called "tree boosting." They're all referring to this same idea that we're trying to make regular decision trees better. Below are some of the terms you might see the method referred as:
@@ -301,6 +320,278 @@ This is arguably one of the most important parameters. This parameter is a value
 **Size of the trees**
 
 The tree size parameter, `\(J\)`, controls the number of terminal nodes in each weak learner. `\(J=2\)` would result in each tree being a stump, and no variable-variable interaction. `\(J=3\)` would allow for a maximum of 2 variables per tree, and a max of 3 leaves. This is a strong controller of the complexity of the trees in the algorithm and coupled with the learning rate can have a big effect on computation time.
+
+---
+class: inverse, center, middle
+
+# Small Example - Boston Housing Data
+
+---
+
+# Boston Housing Data
+
+
+
+We will use the `gbm` function to run the gradient boosting algorithm on the Boston Housing dataset.
+
+
+```r
+set.seed(101)
+
+train &lt;- sample(1:506, size = 354) # 70% train, 30% test
+
+boston_fit &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                  n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                  bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                  cv.folds = 5)
+boston_fit
+```
+
+```
+## gbm(formula = medv ~ ., distribution = "gaussian", data = Boston[train, 
+##     ], n.trees = 10000, interaction.depth = 2, n.minobsinnode = 5, 
+##     shrinkage = 0.01, bag.fraction = 1, train.fraction = 1, cv.folds = 5)
+## A gradient boosted model with gaussian loss function.
+## 10000 iterations were performed.
+*## The best cross-validation iteration was 7822.
+## There were 13 predictors of which 13 had non-zero influence.
+```
+
+---
+
+# Variable Importance
+
+.pull-left[
+
+```r
+fit_sum &lt;- summary(boston_fit)
+```
+
+![](lukas_summary-theory_files/figure-html/unnamed-chunk-3-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+```r
+data.frame(var = fit_sum$var,
+           rel.inf = fit_sum$rel.inf)
+```
+
+```
+##        var    rel.inf
+*## 1    lstat 40.1460178
+*## 2       rm 39.8861947
+## 3      nox  5.3612238
+## 4      dis  3.9964527
+## 5     crim  3.7680485
+## 6  ptratio  2.2230249
+## 7      tax  1.5123905
+## 8    black  1.0392070
+## 9    indus  0.7943987
+## 10     age  0.7041659
+## 11     rad  0.3467483
+## 12    chas  0.1162629
+## 13      zn  0.1058646
+```
+]
+
+---
+
+# Partial Dependence Plots
+
+.pull-left[
+
+```r
+plot(boston_fit, i = "lstat", main = "Partial Dependence Plot for lstat")
+```
+![](lukas_summary-theory_files/figure-html/unnamed-chunk-6-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+```r
+plot(boston_fit, i = "rm", main = "Partial Dependence Plot for rm")
+```
+![](lukas_summary-theory_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+]
+
+---
+class: center, middle
+
+# Optimal Number of Boosting Iterations
+
+
+```r
+best.iter &lt;- gbm.perf(boston_fit, method = "cv")
+```
+![](lukas_summary-theory_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+---
+
+# Optimal Number, cont.
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+
+```r
+pred &lt;- predict.gbm(boston_fit, Boston[-train,], n.trees = best.iter)
+
+error &lt;- sum((pred - Boston$medv[-train])^2)
+print(error)
+```
+
+```
+*## [1] 1881.205
+*```
+
+---
+# Parameter Fine Tuning
+
+
+```r
+boston_fit1 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit2 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit3 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+
+boston_fit4 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.1, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+```
+
+---
+class: center
+
+# Parameter Fine Tuning, cont.
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+
+
+
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; model &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n.trees &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; shrinkage &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n.minobsinnode &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; best_iter &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; error &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7822 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1881.205 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4962 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1928.494 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5036 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1908.342 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1155 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1897.256 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+
+# Comparison with Random Forest
+
+
+```r
+rf &lt;- randomForest(medv ~ ., data = Boston[train,], distribution = "gaussian", 
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   nodesize = 5)
+```
+
+.pull-left[
+
+```
+##         IncNodePurity
+## crim       1605.31160
+## zn          443.36594
+## indus      1771.80600
+## chas         54.37403
+## nox        1585.64250
+*## rm         8222.20150
+## age        1044.81666
+## dis        1651.48160
+## rad         195.58789
+## tax         852.78476
+## ptratio    1434.08462
+## black       584.22248
+*## lstat      7645.99887
+```
+]
+
+.pull-right[
+![](lukas_summary-theory_files/figure-html/unnamed-chunk-18-1.png)&lt;!-- --&gt;
+]
+
+---
+
+# Comparison with Random Forest, cont.
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+
+```r
+predRF &lt;- predict(rf, Boston[-train,], type = "response")
+
+errorRF &lt;- sum((predRF - Boston$medv[-train])^2)
+print(errorRF)
+```
+
+```
+*## [1] 1757.363
+*```
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>

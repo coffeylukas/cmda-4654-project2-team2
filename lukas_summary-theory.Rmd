@@ -50,6 +50,25 @@ You can see how this is similar to random forests in that the algorithm creates 
 
 ---
 
+# Pros & Cons
+
+**Pros**
+
+- Easily interpretable
+- Robust to outliers
+- Can deal with continuous and categorical
+- Capture non-linear relationships well
+- Scale to large datasets
+
+**Cons**
+
+- Can tend to overfit with predictors that have many categories
+- Lack smoothness
+- Can tend to have limited predictive performance
+- Can take a long time to run depending on hyperparameters
+
+---
+
 # Terminology
 
 There is quite a bit of mixed jargon with regards to boosted trees. Since we're using gradient descent to "boost" normal decision trees, the method is called "tree boosting." They're all referring to this same idea that we're trying to make regular decision trees better. Below are some of the terms you might see the method referred as:
@@ -296,4 +315,207 @@ $$F_m(x) = F_{m-1}(x)+\nu\cdot\gamma_mh_m(x)$$
 **Size of the trees**
 
 The tree size parameter, $J$, controls the number of terminal nodes in each weak learner. $J=2$ would result in each tree being a stump, and no variable-variable interaction. $J=3$ would allow for a maximum of 2 variables per tree, and a max of 3 leaves. This is a strong controller of the complexity of the trees in the algorithm and coupled with the learning rate can have a big effect on computation time.
+
+---
+class: inverse, center, middle
+
+# Small Example - Boston Housing Data
+
+---
+
+# Boston Housing Data
+
+```{r, echo = FALSE, message = FALSE}
+library(gbm)
+library(MASS)
+library(randomForest)
+library(knitr)
+```
+
+We will use the `gbm` function to run the gradient boosting algorithm on the Boston Housing dataset.
+
+```{r, highlight.output = 6}
+set.seed(101)
+
+train <- sample(1:506, size = 354) # 70% train, 30% test
+
+boston_fit <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                  n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                  bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                  cv.folds = 5)
+boston_fit
+```
+
+---
+
+# Variable Importance
+
+.pull-left[
+```{r}
+fit_sum <- summary(boston_fit)
+```
+]
+
+.pull-right[
+```{r, highlight.output = c(2,3)}
+data.frame(var = fit_sum$var,
+           rel.inf = fit_sum$rel.inf)
+```
+]
+
+---
+
+# Partial Dependence Plots
+
+.pull-left[
+```{r, eval = FALSE}
+plot(boston_fit, i = "lstat", main = "Partial Dependence Plot for lstat")
+```
+```{r, echo = FALSE}
+plot(boston_fit, i = "lstat", main = "Partial Dependence Plot for lstat")
+```
+]
+
+.pull-right[
+```{r, eval = FALSE}
+plot(boston_fit, i = "rm", main = "Partial Dependence Plot for rm")
+```
+```{r, echo = FALSE}
+plot(boston_fit, i = "rm", main = "Partial Dependence Plot for rm")
+```
+]
+
+---
+class: center, middle
+
+# Optimal Number of Boosting Iterations
+
+```{r, eval = FALSE}
+best.iter <- gbm.perf(boston_fit, method = "cv")
+```
+```{r, echo = FALSE}
+best.iter <- gbm.perf(boston_fit, method = "cv")
+title("GBM Performance")
+legend("topright", legend = c("CV Error", "Validation Error", "Optimal Iterations"), col = c("green", "black", "blue"), lty = c(1,1,2))
+```
+---
+
+# Optimal Number, cont.
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+```{r, highlight.output = TRUE}
+pred <- predict.gbm(boston_fit, Boston[-train,], n.trees = best.iter)
+
+error <- sum((pred - Boston$medv[-train])^2)
+print(error)
+```
+
+---
+# Parameter Fine Tuning
+
+```{r}
+boston_fit1 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit2 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+
+boston_fit3 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+
+boston_fit4 <- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.1, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+
+```
+
+---
+class: center
+
+# Parameter Fine Tuning, cont.
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+```{r, include = FALSE}
+best.iter2 <- gbm.perf(boston_fit2, method = "cv")
+best.iter3 <- gbm.perf(boston_fit3, method = "cv")
+best.iter4 <- gbm.perf(boston_fit4, method = "cv")
+```
+
+```{r, echo = FALSE}
+pred2 <- predict.gbm(boston_fit2, Boston[-train,], n.trees = best.iter2, type = "response")
+pred3 <- predict.gbm(boston_fit3, Boston[-train,], n.trees = best.iter3, type = "response")
+pred4 <- predict.gbm(boston_fit4, Boston[-train,], n.trees = best.iter4, type = "response")
+
+error2 <- sum((pred2 - Boston$medv[-train])^2)
+error3 <- sum((pred3 - Boston$medv[-train])^2)
+error4 <- sum((pred4 - Boston$medv[-train])^2)
+```
+
+```{r, echo = FALSE, highlight.output = 3}
+df <- data.frame(model = c("boston_fit1", "boston_fit2", "boston_fit3", "boston_fit4"), n.trees = c(10000, 5000, 10000, 5000), shrinkage = c(0.01, 0.01, 0.01, 0.1), n.minobsinnode = c(5, 5, 10, 10), best_iter = c(best.iter, best.iter2, best.iter3, best.iter4), error = c(error, error2, error3, error4))
+
+knitr::kable(df, format = "html")
+```
+
+
+---
+
+# Comparison with Random Forest
+
+```{r}
+rf <- randomForest(medv ~ ., data = Boston[train,], distribution = "gaussian", 
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   nodesize = 5)
+```
+
+.pull-left[
+```{r, highlight.output = c(7,14), echo = FALSE}
+rf$importance
+```
+]
+
+.pull-right[
+```{r, echo = FALSE}
+plot(rf$importance, ylab = "IncNodePurity", main = "Variable Importance Plot", cex = 2, pch = 20)
+```
+]
+
+---
+
+# Comparison with Random Forest, cont.
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+```{r, highlight.output = TRUE}
+predRF <- predict(rf, Boston[-train,], type = "response")
+
+errorRF <- sum((predRF - Boston$medv[-train])^2)
+print(errorRF)
+```
+
+
+
+
+
 
