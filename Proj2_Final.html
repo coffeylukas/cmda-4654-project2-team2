@@ -8,6 +8,7 @@
     <link href="libs/remark-css/default.css" rel="stylesheet" />
     <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
     <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="custom.css" type="text/css" />
   </head>
   <body>
     <textarea id="source">
@@ -274,9 +275,12 @@ where `\(odds\)` is the ratio of the sums of the categories (# of yes's/# of no'
 The steps for the algorithm are the same - they just use the new Loss function instead. We calculate the residuals for the previous step, and the next step uses the variables from the data to predict those residuals. There is much more deeper theory that goes into the algorithm for classification, which we won't go into here, but the videos below do a great job of explaining.
 
 StatQuest: https://www.youtube.com/watch?v=jxuNLH5dXCs
+
 StatQuest: https://www.youtube.com/watch?v=StWY5QWMXCw&amp;t=1204s
 
-It is important to note that because we are using gradient descent, we can input *any* differentiable loss function into this algorithm. This could be the mean squared error as in regression, the log odds equation in classification, or any other loss function. That is part of what makes gradient boost so powerful!
+**Note:**
+
+It is important to note that because we are using gradient descent, we can input *any* differentiable loss function into this algorithm. This could be the mean squared error for regression, the log odds equation in classification, or any other loss function. That is part of what makes gradient boost so powerful!
 
 ---
 class: inverse, center, middle
