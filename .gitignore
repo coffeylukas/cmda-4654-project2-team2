@@ -3,3 +3,4 @@ libs
 .DS_Store
 .RData
 .Rhistory
+data/

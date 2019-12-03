@@ -52,20 +52,20 @@ You can see how this is similar to random forests in that the algorithm creates 
 
 # Pros & Cons
 
-**Pros**
+**Pros of Gradient Boosting**
 
 - Easily interpretable
 - Robust to outliers
-- Can deal with continuous and categorical
-- Capture non-linear relationships well
-- Scale to large datasets
+- Can deal with continuous and categorical data
+- Captures non-linear relationships well
+- Scales to large datasets
 
-**Cons**
+**Cons of Gradient Boosting**
 
 - Can tend to overfit with predictors that have many categories
-- Lack smoothness
+- Lacks smoothness
 - Can tend to have limited predictive performance
-- Can take a long time to run depending on hyperparameters
+- Long computation times depending on hyperparameters
 
 ---
 
@@ -81,7 +81,6 @@ There is quite a bit of mixed jargon with regards to boosted trees. Since we're 
 - Gradient boosted regression trees
 
 ---
-layout: false
 class: inverse, middle, center
 
 # Boosting & Gradient Descent
@@ -108,6 +107,7 @@ In machine learning, boosting is an ensemble<sub>1</sub> meta-algorithm<sub>2</s
 # What is Boosting, cont.
 
 **Characteristics of Boosting**
+
 - Uses lean weak classifiers with respect to a distribution
 - Add them to a final strong classifier
 - After a weak learner is added, data weights are readjsuted, known as "re-weighting".
@@ -128,17 +128,27 @@ In machine learning, boosting is an ensemble<sub>1</sub> meta-algorithm<sub>2</s
 
 **What is gradient descent?**
 
-Suppose you want to optimize a function $f(x)$, assuming $f$ is differentiable, gradient descent works by iteratively find
+Suppose you want to optimize a function $f(x)$. Assuming $f$ is differentiable, gradient descent works by iteratively finding
+
 $$x_{t+1} = x_t - \eta {\partial{f} \over \partial x}|_{x=x_t}$$
+
 where $\eta$ is called the step size.
+
 **What is additive model?**
+
 Additive model: $g(x)=f_0(x)+f_1(x)+f_2(x)+...$, where the final classifier $g$ is the sum of simple base classifiers $f_i$. 
+
 **For the boosted trees model, each base classifier is a simple decision tree.**
+
 ---
+
 # Gradient Boosting
+
 **Gradient Descent + Boosting = Gradient Boosting**
+
 Similarly, if we let $g_t(x)=\sum_{i=1}^{t}{f_i(x)}$ (additive model; ensemble) be the classifier trained at iteration t, and $L(y_i,g(x_i))$ be the empirical loss function, at each iteration we will move $g_t$ towards the negative gradient direction $-{\partial L \over \partial g}|_{g=g_t}$ by $\eta$ amount.
 Hence, $f_t$ is chosen to be
+
 $$f_t = \underset{t}{argmin} \sum_{i=1}^N{[{{\partial L(y_i,g(x_i)) \over \partial g(x_i)}|_{g=g_t} }-f(x_i)]^2}$$
 and the algorithm sets $g_{t+1}=g_t + \eta f_t$.
 
@@ -169,9 +179,9 @@ $$F_1(x) = y$$
 
 $$h_1(x) = y - F_1(x)$$
 
-**Step 3:** We combine the two previous models to find the next step in the algorithm.
+**Step 3:** We combine the previous models to find the next steps in the algorithm, then add these to find the final model.
 
-$$F_2(x) = F_1(x) + h_1(x)$$
+$$F_2(x) = F_1(x) + h_1(x)\\...\\final\ model \rightarrow F_M(x)$$
 
 ---
 
@@ -256,7 +266,15 @@ where $odds$ is the ratio of the sums of the categories (# of yes's/# of no's, #
 
 # Classification vs. Regression cont.
 
-The steps for the algorithm are the same - they just use the new Loss function instead. We calculate the residuals for the previous step, and the next step uses the variables from the data to predict those residuals.
+The steps for the algorithm are the same - they just use the new Loss function instead. We calculate the residuals for the previous step, and the next step uses the variables from the data to predict those residuals. There is much more deeper theory that goes into the algorithm for classification, which we won't go into here, but the videos below do a great job of explaining.
+
+StatQuest: https://www.youtube.com/watch?v=jxuNLH5dXCs
+
+StatQuest: https://www.youtube.com/watch?v=StWY5QWMXCw&t=1204s
+
+**Note:**
+
+It is important to note that because we are using gradient descent, we can input *any* differentiable loss function into this algorithm. This could be the mean squared error for regression, the log odds equation in classification, or any other loss function. That is part of what makes gradient boost so powerful!
 
 ---
 class: inverse, center, middle
@@ -497,6 +515,11 @@ print(errorRF)
 ```
 
 ---
+class: inverse, center, middle
+
+# Big Example - Economic Freedom Data
+
+---
 
 # Big Example (Economic Freedom)
 
@@ -530,7 +553,7 @@ These are the required packages needed to run gradient boosting machines.
 
 ```{r,echo=FALSE}
 #freedom <- read.csv("/Users/AllieLewis/Desktop/Classes/CMDA_4654/Project 2/efw_cc.csv", header = T)
-freedom <- read.csv("C:/Users/benny/OneDrive/Documents/CMDA 4654/economic-freedom/efw_cc.csv", header = T)
+freedom <- read.csv("~/Documents/School/VT/CMDA4654/Project2/data/efw_cc.csv", header = T)
 
 freedom <- freedom[!is.na(freedom$ECONOMIC.FREEDOM),]
 names(freedom)[names(freedom) == "X4b_regulatory_trade_barriers"] <- "X4b_reg_trade_bar"
@@ -539,7 +562,7 @@ names(freedom)[names(freedom) == "X1a_government_consumption"] <- "X1a_gov_consu
 
 ---
 
-#Economic Freedom (Initial Model)
+# Economic Freedom (Initial Model)
 ```{r}
 free_split <- initial_split(freedom, prop = .7)
 free_train <- training(free_split)
@@ -553,7 +576,7 @@ gbm.fit
 If you wanted to use gradient boosting for classification, all you need to do to implement it is to change the distribution to bernoulli and to make sure your response variable is a column that represents some sort of classification and contains either ones or zeros.
 
 ---
-#Economic Freedom (Initial Model cont.)
+# Economic Freedom (Initial Model cont.)
 .pull-left[
 ```{r, eval=FALSE}
 fit_sum1 <- summary(gbm.fit)
@@ -571,7 +594,7 @@ head(data.frame(fit_sum1$var,
 ]
 ---
 
-#Economic Freedom (MSE and Min Trees)
+# Economic Freedom (MSE and Min Trees)
 .pull-left[
 ```{r highlight.output = TRUE}
 sqrt(min(gbm.fit$cv.error))
@@ -589,7 +612,7 @@ title("GBM Preformance")
 ]
 ---
 
-#Economic Freedom (Second Model)
+# Economic Freedom (Second Model)
 ```{r}
 gbm.fit2 <- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian", 
                 data = free_train, n.trees = 2500, interaction.depth = 1, 
@@ -603,7 +626,7 @@ sqrt(gbm.fit2$cv.error[min_MSE])
 ```
 ---
 
-#Economic Freedom (Min Trees)
+# Economic Freedom (Min Trees)
 ```{r, eval=FALSE}
 gbm.perf(gbm.fit2, method = "cv")
 ```
@@ -613,42 +636,42 @@ title("GBM Preformance")
 ```
 ---
 
-#Economic Freedom (Multiple Models)
+# Economic Freedom (Multiple Models)
 ```{r}
-hyper_grid <- expand.grid(shrinkage = c(.01, .1, .3),
-                          interaction.depth = c(1, 2, 3),
-                          n.minobsinnode = c(5, 10, 15),
-                          bag.fraction = c(.65, .8, 1), 
-                          optimal_trees = 0,min_RMSE = 0)
-for(i in 1:nrow(hyper_grid)) {
-  
-  # train model
-  gbm.tune <- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian",
-                  data = free_train, n.trees = 2500,
-                  interaction.depth = hyper_grid$interaction.depth[i],
-                  shrinkage = hyper_grid$shrinkage[i],
-                  n.minobsinnode = hyper_grid$n.minobsinnode[i],
-                  bag.fraction = hyper_grid$bag.fraction[i],
-                  train.fraction = .75)
-  
-  # add min training error and trees to grid
-  hyper_grid$optimal_trees[i] <- which.min(gbm.tune$valid.error)
-  hyper_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
-  
-}
+# hyper_grid <- expand.grid(shrinkage = c(.01, .1, .3),
+#                           interaction.depth = c(1, 2, 3),
+#                           n.minobsinnode = c(5, 10, 15),
+#                           bag.fraction = c(.65, .8, 1), 
+#                           optimal_trees = 0,min_RMSE = 0)
+# for(i in 1:nrow(hyper_grid)) {
+#   
+#   # train model
+#   gbm.tune <- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian",
+#                   data = free_train, n.trees = 2500,
+#                   interaction.depth = hyper_grid$interaction.depth[i],
+#                   shrinkage = hyper_grid$shrinkage[i],
+#                   n.minobsinnode = hyper_grid$n.minobsinnode[i],
+#                   bag.fraction = hyper_grid$bag.fraction[i],
+#                   train.fraction = .75)
+#   
+#   # add min training error and trees to grid
+#   hyper_grid$optimal_trees[i] <- which.min(gbm.tune$valid.error)
+#   hyper_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
+#   
+# }
 ```
 ---
 
-#Economic Freedom (Multiple Models cont.)
+# Economic Freedom (Multiple Models cont.)
 
 ```{r}
-hyper_grid <- hyper_grid %>% dplyr::arrange(min_RMSE)
-knitr::kable(head(hyper_grid,8), format = "html")
+# hyper_grid <- hyper_grid %>% dplyr::arrange(min_RMSE)
+# knitr::kable(head(hyper_grid,8), format = "html")
 ```
 
 ---
 
-#Economic Freedom (Best Model)
+# Economic Freedom (Best Model)
 
 ```{r,highlight.output = TRUE}
 gbm.fit.final <- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian", 
@@ -660,7 +683,7 @@ caret::RMSE(pred, free_test$ECONOMIC.FREEDOM)
 ```
 ---
 
-#Economic Freedom(Best Model cont.)
+# Economic Freedom(Best Model cont.)
 .pull-left[
 ```{r, eval=FALSE}
 fit_sum <- summary(gbm.fit.final)
