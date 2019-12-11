@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Boosted Trees</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Authors: Lukas Coffey, Ben Zevin, Chandler Crescentini, Juhong Hyun" />
+    <meta name="date" content="2019-12-11" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Boosted Trees
+## CMDA 4654 - Project 2, Group 2
+### Authors: Lukas Coffey, Ben Zevin, Chandler Crescentini, Juhong Hyun
+### 2019-12-11
+
+---
+
+
+
+
+# Outline
+
+- Summary of boosted trees
+- What is boosting?
+- Boosted regression theory
+- Boosted classification theory
+- Description of method parameters
+- Using `gbm` on a small dataset
+- Using gradient boosting on a large dataset
+
+---
+
+# Summary
+
+Commonly referred too as gradient boosting, boosted trees is a method that works against the common problem among trees - overfitting a dataset. It's called "gradient" boosting because it uses gradient descent to iteratively find the best fit to the data. We are trying to "step" in the right direction, towards the least amount of error. The idea stems from a method called Adaboost - we will not discuss it here but you can find plenty of resources explaining the method online. 
+
+There are two use cases for gradient tree boosting, **regression** and **classification**. The concept is the same but the implementation varies slightly depending on the use case. In this presentation we will touch on classification but focus on regression.
+
+---
+
+# Summary
+
+Gradient boost for regression works by creating small regression trees (known as weak learners), calculating the errors from that weak learner, and fitting another tree to predict those errors. These models are then combined to form the gradient boosted model.
+
+Each step of the algorithm creates a new tree that may be small or large using random samples of columns, depending on your tuning parameters. All of the trees are then scaled by a tuning parameter between 0 and 1. *This learning rate parameter basically determines how quickly our boosted trees find a good fit - the smaller the learning rate the better the model.*
+
+The iterations continue for either **A)** a specified number of steps, or **B)** until the errors become sufficiently small.
+
+You can see how this is similar to random forests in that the algorithm creates many trees, and can use random samples of columns. However, the algorithm does not just pick variables at random, it uses the variables that you provide. We can also visualize the importance of the variables we give the algorithm and exclude/include certain columns that provide the most prediction power. We will demonstrate this later.
+
+---
+
+# Pros &amp; Cons
+
+**Pros of Gradient Boosting**
+
+- Easily interpretable
+- Robust to outliers
+- Can deal with continuous and categorical data
+- Captures non-linear relationships well
+- Scales to large datasets
+
+**Cons of Gradient Boosting**
+
+- Can tend to overfit with predictors that have many categories
+- Lacks smoothness
+- Can tend to have limited predictive performance
+- Long computation times depending on hyperparameters
+
+---
+
+# Terminology
+
+There is quite a bit of mixed jargon with regards to boosted trees. Since we're using gradient descent to "boost" normal decision trees, the method is called "tree boosting." They're all referring to this same idea that we're trying to make regular decision trees better. Below are some of the terms you might see the method referred as:
+
+- Tree boosting
+- Boosted trees
+- Boosted regression 
+- Boosted classification
+- Gradient boosting
+- Gradient boosted regression trees
+
+---
+class: inverse, middle, center
+
+# Boosting &amp; Gradient Descent
+
+---
+
+# What is Boosting?
+
+**Key question:** Can a set of weak learners create a single strong learner?
+
+In machine learning, boosting is an ensemble&lt;sub&gt;1&lt;/sub&gt; meta-algorithm&lt;sub&gt;2&lt;/sub&gt; for primarily reducing bias and variance in supervised learning, and a family of machine learning algorithms that convert weak learners&lt;sub&gt;3&lt;/sub&gt; to strong learners&lt;sub&gt;4&lt;/sub&gt;.
+
+1. *Meta-algorithm:* higher-level procedure designed to find a heuristic that may provide a sufficiently good solution to an optimization problem especially with incomplete information.
+
+2. *Ensemble:* multi-learning algorithms
+
+3. *Weak learner:* classifier that is only slightly correlated with the true classification
+
+4. *Strong learner:* classifier that is arbitrarily well-correlated with the true classification.
+
+
+---
+
+# What is Boosting, cont.
+
+**Characteristics of Boosting**
+
+- Uses lean weak classifiers with respect to a distribution
+- Add them to a final strong classifier
+- After a weak learner is added, data weights are readjsuted, known as "re-weighting".
+- Misclassified input data gain a higher weight and examples that are classified correctly lose weight.
+- Thus, future weak learners focus more on the examples that previous weak learners misclassified.
+
+**Types of Boosting**
+
+- AdaBoost (an adaptive boosting algorithm that won the prestigious Gödel Prize. / historically significant)
+
+- Gradient Boosting (Gradient Descent + Boosting)
+
+- LPBoost, TotalBoost, BrownBoost, xgboost, MadaBoost, etc.
+
+---
+
+# Key Concepts
+
+**What is gradient descent?**
+
+Suppose you want to optimize a function `\(f(x)\)`. Assuming `\(f\)` is differentiable, gradient descent works by iteratively finding
+
+`$$x_{t+1} = x_t - \eta {\partial{f} \over \partial x}|_{x=x_t}$$`
+
+where `\(\eta\)` is called the step size.
+
+**What is additive model?**
+
+Additive model: `\(g(x)=f_0(x)+f_1(x)+f_2(x)+...\)`, where the final classifier `\(g\)` is the sum of simple base classifiers `\(f_i\)`. 
+
+**For the boosted trees model, each base classifier is a simple decision tree.**
+
+---
+
+# Gradient Boosting
+
+**Gradient Descent + Boosting = Gradient Boosting**
+
+Similarly, if we let `\(g_t(x)=\sum_{i=1}^{t}{f_i(x)}\)` (additive model; ensemble) be the classifier trained at iteration t, and `\(L(y_i,g(x_i))\)` be the empirical loss function, at each iteration we will move `\(g_t\)` towards the negative gradient direction `\(-{\partial L \over \partial g}|_{g=g_t}\)` by `\(\eta\)` amount.
+Hence, `\(f_t\)` is chosen to be
+
+`$$f_t = \underset{t}{argmin} \sum_{i=1}^N{[{{\partial L(y_i,g(x_i)) \over \partial g(x_i)}|_{g=g_t} }-f(x_i)]^2}$$`
+and the algorithm sets `\(g_{t+1}=g_t + \eta f_t\)`.
+
+---
+class: inverse, middle, center
+
+# Boosted Regression
+
+---
+
+# Boosted Regression
+## References
+- Gradient Boosting Explained: http://blog.kaggle.com/2017/01/23/a-kaggle-master-explains-gradient-boosting/
+- Gradient Boosting: https://en.wikipedia.org/wiki/Gradient_boosting
+- StatQuest - Gradient Boost, Parts 1 &amp; 2: https://www.youtube.com/watch?v=3CC4N4z3GJc&amp;t=582s
+
+---
+
+# Boosted Regression - Main Idea
+
+The main idea behind boosted regression is that we fit a model, then fit another model to the residuals, and then the combination of these becomes the new model. We iterate this idea many times to find the optimal model. In pseudocode:
+
+**Step 1:** We fit the original model.
+
+`$$F_1(x) = y$$`
+
+**Step 2:** We fit a new model to the residuals of the model in Step 1.
+
+`$$h_1(x) = y - F_1(x)$$`
+
+**Step 3:** We combine the previous models to find the next steps in the algorithm, then add these to find the final model.
+
+`$$F_2(x) = F_1(x) + h_1(x)\\...\\final\ model \rightarrow F_M(x)$$`
+
+---
+
+# Boosted Regression - Step 1
+
+To start the regression algorithm, we initialize the model with the average of our `\(y\)` values. This becomes our starting point because initially we want to minimize the squared error. 
+
+`$$F_0(x) = \underset{\gamma}{argmin} \sum_{i=1}^n{L(y_i, \gamma)} = \underset{\gamma}{argmin} \sum_{i=1}^n{(\gamma - y_i)^2} = \frac{1}{n}\sum_{i=1}^n{y_i}$$`
+
+Now, we can define the following models just like we did before in pseudocode.
+
+`$$F_{m+1}(x) = F_m(x) + h_m(x)=y,\ for\ m\ge0$$`
+
+where `\(h_m\)` is a base learner (e.g. weak learner; tree).
+
+**Note:** How do we select `\(M\)`? This value determines how many times we iterate until we find the best model. This is best done by cross-validation. We'll discuss this later in the regularization section.
+
+---
+
+# Boosted Regression - Step 2
+
+After we initialize the model, `\(F_0(x)\)`, we can begin iterating. Each iteration contains 4 steps:
+
+**Step 1:** Compute the pseudo-residuals (this is the gradient descent part of *gradient* boost).
+`$$r_{im} = - \left[\frac{\partial L(y_i,F(x_i))}{\partial F(x_i)}\right]_{F(x)=F_{m-1}(x)}\ for\ i=1,...,n$$`
+
+**Step 2:** Fit a base learner (weak learner, e.g. a tree) to the pseudo-residuals. This is `\(h_m(x)\)`.
+
+**Step 3:** Compute the step magnitude multiplier, `\(\gamma_m\)`, by solving the 1D optimization problem:
+`$$\gamma_m = \underset{\gamma}{argmin} \sum_{i=1}^n{L(y_i,\ F_{m-1}(x_i) + \gamma h_m(x_i))}$$`
+
+**Step 4:** Update the model with the new pieces:
+`$$F_m(x) = F_{m-1}(x)+\gamma_mh_m(x)$$`
+
+---
+
+# Boosted Regression - Step 3
+
+After we compute all the iterations of the algorithm, our final model is then:
+`$$for\ m=1\ to\ M,\\ F_M(x)$$`
+
+with inputs:
+1. Training data set, `\({(x_i, y_i)}_{i=1}^{n}\)`
+2. Loss function, `\(L(y, F(x))\)`
+3. Number of iterations, `\(M\)`
+
+We will talk about `\(M\)` and a few more paramaters of the algorithm later.
+
+---
+class: inverse, center, middle
+
+# Boosted Classification
+
+---
+
+# Boosted Classification
+## References
+- Boosting: https://en.wikipedia.org/wiki/Boosting_(machine_learning)#cite_note-9
+- Michael Kearns(1988); Thoughts on Hypothesis Boosting, Unpublished manuscript (Machine Learning class project, December 1988)
+- Gradient Boosting: https://turi.com/learn/userguide/supervised-learning/boosted_trees_regression.html
+
+
+---
+
+# Classification vs. Regression
+
+## What is different between classification and regression?
+
+With classification, we are not dealing with a continuous response variable. Thus we have to work with proportions and probabilities in our algorithm instead of continuous numbers. 
+
+In the classification case, our Loss Function is:
+`$$L(y_i, \gamma) = -y_i\gamma\ +\ log(1+e^{\gamma})$$`
+
+where `\(y_i\)` is a classification (0:1, yes:no, etc.), and `\(\gamma\)` is `\(log(odds)\)`. This is the function we are trying to minimize and that we find the gradient of in our algorithm.
+
+This changes our initial value when we initialize the algorithm to a log odds value:
+`$$F_0(x) = log(odds)$$`
+
+where `\(odds\)` is the ratio of the sums of the categories (# of yes's/# of no's, # of 1's/# of 0's, etc.).
+
+---
+
+# Classification vs. Regression cont.
+
+The steps for the algorithm are the same - they just use the new Loss function instead. We calculate the residuals for the previous step, and the next step uses the variables from the data to predict those residuals. There is much more deeper theory that goes into the algorithm for classification, which we won't go into here, but the videos below do a great job of explaining.
+
+StatQuest: https://www.youtube.com/watch?v=jxuNLH5dXCs
+
+StatQuest: https://www.youtube.com/watch?v=StWY5QWMXCw&amp;t=1204s
+
+**Note:**
+
+It is important to note that because we are using gradient descent, we can input *any* differentiable loss function into this algorithm. This could be the mean squared error for regression, the log odds equation in classification, or any other loss function. That is part of what makes gradient boost so powerful!
+
+---
+class: inverse, center, middle
+
+# Regularization
+
+---
+
+# Regularization
+
+One of the main goals in using boosted trees is to avoid overfitting the data. To achieve a boosted model that is well-generalized and not overfitted, we can make use of **regularization**. These are just a few of the regularization parameters that we can use to control effectiveness of the boosting algorithm:
+- The number of iterations, `\(M\)`
+- Maximum tree depth
+- Minimum number of observations in tree leaves
+- Penalizing complexity: pruning back the weak learners that don't provide any benefit
+- Shrinkage parameter, `\(\nu\)`, known as the *"learning rate"*
+- Size of the trees
+
+**The number of iterations, `\(M\)`**
+
+This is the number of times we should run the gradient descent algorithm (basically the number of trees we create). As stated previously, `\(M\)` is most commonly chosen using cross-validation. Increasing `\(M\)` reduces error on the training set, but making `\(M\)` too high can lead to overfitting.
+
+---
+
+# Regularization Parameters
+
+**Maximum tree depth**
+
+This is the maximum distance from the root node to the furthest leaf node in each of our trees. This helps control how "weak" our weak learners should actually be.
+
+**Minimum number of observations in tree leaves**
+
+This parameter controls the minimum number of observations within each leaf of the weak learners. This tells the weak learners to basically ignore any splits or new terminal nodes that have fewer observations than this number. This helps to reduce variance in the predictions at the leaves.
+
+**Penalizing complexity: pruning back the weak learners that don't provide any benefit**
+
+This is defined as the "proportional number of leaves in the learned trees." We can employ a post-pruning algorithm that removes branches failing to reduce the loss by a certain threshold. This basically helps to keep the trees from becoming too strong and overfitting.
+
+---
+
+# Regularization Parameters, cont.
+
+**Shrinkage parameter, `\(\nu\)`, known as the "learning rate"**
+
+This is arguably one of the most important parameters. This parameter is a value between 0 and 1, and controls how fast or slow our boosted algorithm finds the optimal model. A lower learning rate (e.g. 0.1) means higher computation time and more iterations, but a better and more generalized model. It is applied to the algorithm as:
+`$$F_m(x) = F_{m-1}(x)+\nu\cdot\gamma_mh_m(x)$$`
+
+**Size of the trees**
+
+The tree size parameter, `\(J\)`, controls the number of terminal nodes in each weak learner. `\(J=2\)` would result in each tree being a stump, and no variable-variable interaction. `\(J=3\)` would allow for a maximum of 2 variables per tree, and a max of 3 leaves. This is a strong controller of the complexity of the trees in the algorithm and coupled with the learning rate can have a big effect on computation time.
+
+---
+class: inverse, center, middle
+
+# Small Example - Boston Housing Data
+
+---
+
+# Boston Housing Data
+
+
+
+We will use the `gbm` function to run the gradient boosting algorithm on the Boston Housing dataset.
+
+
+```r
+set.seed(101)
+train &lt;- sample(1:506, size = 354) # 70% train, 30% test
+boston_fit &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                  n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                  bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                  cv.folds = 5)
+boston_fit
+```
+
+```
+## gbm(formula = medv ~ ., distribution = "gaussian", data = Boston[train, 
+##     ], n.trees = 10000, interaction.depth = 2, n.minobsinnode = 5, 
+##     shrinkage = 0.01, bag.fraction = 1, train.fraction = 1, cv.folds = 5)
+## A gradient boosted model with gaussian loss function.
+## 10000 iterations were performed.
+*## The best cross-validation iteration was 7822.
+## There were 13 predictors of which 13 had non-zero influence.
+```
+
+---
+
+# Variable Importance
+
+.pull-left[
+
+```r
+fit_sum &lt;- summary(boston_fit)
+```
+
+![](FinalPresentation_files/figure-html/unnamed-chunk-3-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+```r
+data.frame(var = fit_sum$var,
+           rel.inf = fit_sum$rel.inf)
+```
+
+```
+##        var    rel.inf
+*## 1    lstat 40.1460178
+*## 2       rm 39.8861947
+## 3      nox  5.3612238
+## 4      dis  3.9964527
+## 5     crim  3.7680485
+## 6  ptratio  2.2230249
+## 7      tax  1.5123905
+## 8    black  1.0392070
+## 9    indus  0.7943987
+## 10     age  0.7041659
+## 11     rad  0.3467483
+## 12    chas  0.1162629
+## 13      zn  0.1058646
+```
+]
+
+---
+
+# Partial Dependence Plots
+
+Show us the marginal effect of variables on the predicted outcome.
+
+.pull-left[
+
+```r
+plot(boston_fit, i = "lstat")
+```
+![](FinalPresentation_files/figure-html/unnamed-chunk-6-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+```r
+plot(boston_fit, i = "rm")
+```
+![](FinalPresentation_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+]
+
+---
+class: center, middle
+
+# Optimal Number of Boosting Iterations
+
+
+```r
+best.iter &lt;- gbm.perf(boston_fit, method = "cv")
+```
+![](FinalPresentation_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+---
+
+# Optimal Number, cont.
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+
+```r
+pred &lt;- predict.gbm(boston_fit, Boston[-train,], n.trees = best.iter)
+error &lt;- sum((pred - Boston$medv[-train])^2)
+print(error)
+```
+
+```
+*## [1] 1881.205
+*```
+
+---
+# Parameter Fine Tuning
+
+
+```r
+boston_fit1 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+boston_fit2 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 5,
+                   cv.folds = 5)
+boston_fit3 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 10000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+boston_fit4 &lt;- gbm(medv ~ ., data = Boston[train,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.1, interaction.depth = 2,
+                   bag.fraction = 1.0, train.fraction = 1.0, n.minobsinnode = 10,
+                   cv.folds = 5)
+```
+
+---
+class: center
+
+# Parameter Fine Tuning, cont.
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+
+
+
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; model &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n.trees &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; shrinkage &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n.minobsinnode &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; best_iter &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; error &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7822 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1881.205 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4962 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1928.494 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5036 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1908.342 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; boston_fit4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1155 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1897.256 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+
+# Comparison with Random Forest
+
+
+```r
+rf &lt;- randomForest(medv ~ ., data = Boston[train,], distribution = "gaussian", 
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   nodesize = 5)
+```
+
+.pull-left[
+
+```
+##         IncNodePurity
+## crim       1605.31160
+## zn          443.36594
+## indus      1771.80600
+## chas         54.37403
+## nox        1585.64250
+*## rm         8222.20150
+## age        1044.81666
+## dis        1651.48160
+## rad         195.58789
+## tax         852.78476
+## ptratio    1434.08462
+## black       584.22248
+*## lstat      7645.99887
+```
+]
+
+.pull-right[
+![](FinalPresentation_files/figure-html/unnamed-chunk-18-1.png)&lt;!-- --&gt;
+]
+
+---
+
+# Comparison with Random Forest, cont.
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+&amp;nbsp;
+
+
+```r
+predRF &lt;- predict(rf, Boston[-train,], type = "response")
+errorRF &lt;- sum((predRF - Boston$medv[-train])^2)
+print(errorRF)
+```
+
+```
+*## [1] 1757.363
+*```
+
+---
+class: inverse, center, middle
+
+# Big Example - Economic Freedom Data
+
+---
+
+# Big Example (Economic Freedom)
+
+The following dataset is used to determine the freedom index and was published in the *Economic Freedom of the World* by the *Fraser Institute* measures the degree to which the policies and istitutions of countries are supportive of economic freedom. There are 36 variables in this data set but each of them fit into a one of the five broad areas.
+
+**1.** Size of Goverment
+
+**2.** Legal System and Property Rights
+
+**3.** Sound Money
+
+**4.** Freedom to Trade Internatioanlly
+
+**5.** Regulation
+
+
+
+- Dataset: https://www.kaggle.com/gsutters/economic-freedom
+
+---
+
+#Economic Freedom (Read and split)
+
+
+```r
+library(gbm)
+library(rsample)
+library(dplyr)
+library(caret)
+```
+These are the required packages needed to run gradient boosting machines.
+
+
+
+---
+
+# Economic Freedom (Initial Model)
+
+```r
+free_split &lt;- initial_split(freedom, prop = .7)
+free_train &lt;- training(free_split)
+free_test  &lt;- testing(free_split)
+gbm.fit &lt;- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian", 
+               data = free_train, n.trees = 5000, interaction.depth = 1, 
+               shrinkage = 0.001, cv.folds = 5)
+gbm.fit
+```
+
+```
+## gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian", 
+##     data = free_train, n.trees = 5000, interaction.depth = 1, 
+##     shrinkage = 0.001, cv.folds = 5)
+## A gradient boosted model with gaussian loss function.
+## 5000 iterations were performed.
+## The best cross-validation iteration was 5000.
+## There were 35 predictors of which 19 had non-zero influence.
+```
+
+If you wanted to use gradient boosting for classification, all you need to do to implement it is to change the distribution to bernoulli and to make sure your response variable is a column that represents some sort of classification and contains either ones or zeros.
+
+---
+# Economic Freedom (Initial Model cont.)
+.pull-left[
+
+```r
+fit_sum1 &lt;- summary(gbm.fit)
+```
+![](FinalPresentation_files/figure-html/unnamed-chunk-24-1.png)&lt;!-- --&gt;
+]
+.pull-right[
+
+```r
+head(data.frame(fit_sum1$var, 
+                fit_sum1$rel.inf),8)
+```
+
+```
+##           fit_sum1.var fit_sum1.rel.inf
+## 1             X4_trade        33.786376
+## 2             quartile        21.491442
+## 3       X3_sound_money        16.319970
+## 4        X5_regulation        14.482485
+## 5                 rank         3.192336
+## 6             ISO_code         2.900033
+## 7    X4b_reg_trade_bar         2.564217
+## 8 X2b_impartial_courts         1.465190
+```
+]
+---
+
+# Economic Freedom (MSE and Min Trees)
+.pull-left[
+
+```r
+sqrt(min(gbm.fit$cv.error))
+```
+
+```
+*## [1] 0.3071593
+*```
+]
+
+.pull-right[
+
+```r
+gbm.perf(gbm.fit, method = "cv")
+```
+
+```
+*## [1] 5000
+*```
+
+![](FinalPresentation_files/figure-html/unnamed-chunk-28-1.png)&lt;!-- --&gt;
+]
+---
+
+# Economic Freedom (Second Model)
+
+```r
+gbm.fit2 &lt;- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian", 
+                data = free_train, n.trees = 2500, interaction.depth = 1, 
+                shrinkage = 0.001, cv.folds = 5) 
+min_MSE &lt;- which.min(gbm.fit2$cv.error)
+min_MSE
+```
+
+```
+## [1] 2500
+```
+
+```r
+# get MSE and compute RMSE
+sqrt(gbm.fit2$cv.error[min_MSE])
+```
+
+```
+*## [1] 0.4830319
+*```
+---
+
+# Economic Freedom (Min Trees)
+
+```r
+gbm.perf(gbm.fit2, method = "cv")
+```
+
+```
+*## [1] 2500
+*```
+
+![](FinalPresentation_files/figure-html/unnamed-chunk-32-1.png)&lt;!-- --&gt;
+---
+
+# Economic Freedom (Multiple Models)
+
+```r
+# hyper_grid &lt;- expand.grid(shrinkage = c(.01, .1, .3),
+#                           interaction.depth = c(1, 2, 3),
+#                           n.minobsinnode = c(5, 10, 15),
+#                           bag.fraction = c(.65, .8, 1),
+#                           optimal_trees = 0,min_RMSE = 0)
+# for(i in 1:nrow(hyper_grid)) {
+# 
+#   # train model
+#   gbm.tune &lt;- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian",
+#                   data = free_train, n.trees = 2500,
+#                   interaction.depth = hyper_grid$interaction.depth[i],
+#                   shrinkage = hyper_grid$shrinkage[i],
+#                   n.minobsinnode = hyper_grid$n.minobsinnode[i],
+#                   bag.fraction = hyper_grid$bag.fraction[i],
+#                   train.fraction = .75)
+# 
+#   # add min training error and trees to grid
+#   hyper_grid$optimal_trees[i] &lt;- which.min(gbm.tune$valid.error)
+#   hyper_grid$min_RMSE[i] &lt;- sqrt(min(gbm.tune$valid.error))
+# 
+# }
+```
+---
+
+# Economic Freedom (Multiple Models cont.)
+
+
+```r
+# hyper_grid &lt;- hyper_grid %&gt;% dplyr::arrange(min_RMSE)
+# knitr::kable(head(hyper_grid,8), format = "html")
+```
+
+---
+
+# Economic Freedom (Best Model)
+
+
+```r
+gbm.fit.final &lt;- gbm(formula = ECONOMIC.FREEDOM ~ ., distribution = "gaussian", 
+                     data = free_train, n.trees = 2295, interaction.depth = 1, 
+                     shrinkage = 0.3, n.minobsinnode = 10, bag.fraction = .8)
+# Predictions and RMSE
+pred &lt;- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, free_test)
+caret::RMSE(pred, free_test$ECONOMIC.FREEDOM)
+```
+
+```
+*## [1] 0.1418687
+*```
+---
+
+# Economic Freedom(Best Model cont.)
+.pull-left[
+
+```r
+fit_sum &lt;- summary(gbm.fit.final)
+```
+![](FinalPresentation_files/figure-html/unnamed-chunk-37-1.png)&lt;!-- --&gt;
+]
+.pull-right[
+
+```r
+head(data.frame(fit_sum$var, 
+                fit_sum$rel.inf),8)
+```
+
+```
+##           fit_sum.var fit_sum.rel.inf
+## 1            X4_trade       31.890712
+## 2            quartile       19.227482
+## 3      X3_sound_money       12.506616
+## 4       X5_regulation       11.799117
+## 5       X3c_inflation        7.211059
+## 6            ISO_code        4.242252
+## 7  X1_size_government        3.429052
+## 8 X1a_gov_consumption        2.832253
+```
+]
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
